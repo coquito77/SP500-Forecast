@@ -1,0 +1,16 @@
+base
+knitr
+bitops
+RCurl
+dplyr
+ggplot2
+scales
+zoo
+timeDate
+forecast
+lattice
+caret
+foreach
+cv.ts
+xtable
+reshape2

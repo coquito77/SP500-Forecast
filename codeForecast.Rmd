@@ -1,0 +1,442 @@
+---
+title: "SP500 forecast"
+author: "Moises Evangelista"
+date: "August 26, 2015"
+output: 
+  beamer_presentation:
+    theme: "AnnArbor"
+    fonttheme: "serif"
+    fig_width: 7
+    fig_height: 6
+    fig_caption: true
+    fig_crop: false
+---
+
+## Introduction
+
+The purpose of this analysis is to determine if the SP500 Index (Index) is overpriced, as of August 2015, and complete some forecasting analysis.
+
+A forecast of the Index. The Index data was downloaded from [Yahoo Finance](http://finance.yahoo.com/q?s=%5EGSPC) in August after if had significant drops.  Consumer Price Index data was used to deflate the Index's historical price.  This data can be downloaded from [here](http://www.bls.gov/data/).
+
+In conclusion, it seems that the Index is currently overpriced.
+
+
+## Analysis steps
+
+- The data was downloaded
+- Historical data was visualized
+- Historical data adjusted by the CPI and then was visualized
+- Forecasts were completed
+
+
+```{r echo=FALSE, message = FALSE, include=FALSE}
+
+rm(list=ls(all=TRUE)) #start with empty workspace
+startTime <- Sys.time()
+
+
+setwd("C:/Users/E551910/Desktop/SP500-Forecast/") # set the working directory
+list.files() # see whats there
+library(knitr)
+library(RCurl)
+```
+
+```{r import data, echo =FALSE, message = FALSE, cache=TRUE}
+
+x <- getURL("http://real-chart.finance.yahoo.com/table.csv?s=%5EGSPC&a=00&b=3&c=1950&d=07&e=26&f=2015&g=m&ignore=.csv")
+
+SP500MonthlyData <- read.csv(text = x)
+
+# the date is a factor so conver it to date
+
+SP500MonthlyData$DateValid <- as.Date(SP500MonthlyData$Date, format = "%Y-%m-%d")
+
+SP500MonthlyData$Year <- as.integer(format(SP500MonthlyData$DateValid, "%Y"))
+
+SP500MonthlyData$Period <- as.integer(format(SP500MonthlyData$DateValid, "%m"))
+
+# import csv data. 
+# data is from here, but saved locally
+# http://data.bls.gov/pdq/SurveyOutputServlet or http://data.bls.gov/cgi-bin/surveymost
+
+ConsumerPriceIndexAllUrbanConsumers <- read.table("Consumer Price Index - All Urban Consumers.txt",
+                                                  header = TRUE, sep =",")
+
+library(dplyr)
+
+# remove records that are not for month periods or before 1950
+
+ConsumerPriceIndexAllUrbanConsumersMonths <- ConsumerPriceIndexAllUrbanConsumers %>% 
+  filter(  grepl('M', Period)) %>%
+  filter(Year >= 1950)
+
+# extract the numeric part of the month
+
+ConsumerPriceIndexAllUrbanConsumersMonths$Period <- as.integer(gsub("M","", 
+                                                                        ConsumerPriceIndexAllUrbanConsumersMonths$Period))
+
+comboData <- left_join(SP500MonthlyData, ConsumerPriceIndexAllUrbanConsumersMonths)
+
+# create a field with adjusted values
+
+comboData$OpenHigh <- comboData$Open/comboData$Value
+
+# get a log value from the preciding field
+
+comboData$OpenHighLog <- log10(comboData$OpenHigh )
+```
+
+## SP500 Open Price by Month 
+
+```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Open market price trend Jan 2014 - Jul 2015"}
+library(ggplot2)
+library(scales)
+library(grid)
+
+options(digits=2)
+
+# get the end and start dates of the data
+end <- max(comboData$DateValid)
+start <- min(comboData$DateValid)
+
+endRecent <- as.Date('2015-07-31')
+startRecent <- as.Date('2015-01-01')
+
+# code is from here
+# https://learnr.wordpress.com/2009/05/08/ggplot2-plot-inside-a-plot/
+
+theme_white <- function() {
+  theme_update(panel.background = element_blank(),
+               panel.grid.major = element_blank())
+}
+theme_set(theme_bw())
+
+theme_white()
+
+p <- ggplot(comboData, aes(DateValid, Open)) + labs(x = NULL,
+                                                    y = ("Open Price")) 
+
+mainplot <- p %+%  
+  geom_line(data = subset(comboData, DateValid >= '2014-01-01'), 
+            colour = I("grey"),
+            size = 0.8) + 
+  geom_smooth(data = subset(comboData,  DateValid >= '2014-01-01'), se = FALSE) +
+  scale_y_continuous(labels = comma_format(),
+                     limits=c(1500, 2200)) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5),
+        axis.title.y = element_text(size = 8, 
+                                    angle = 90),
+        axis.text.y = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5),
+        plot.margin = unit(c(0,0,0,0), "cm"))
+
+
+p1 <- p + geom_rect(aes(xmin = as.Date('2014-01-01'), 
+                        xmax = max(comboData$DateValid),
+                        ymin = min(Open, na.rm = TRUE), 
+                        ymax = max(Open, na.rm = TRUE)),
+                    fill = alpha("lightblue", 0.2)) + 
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks=element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        plot.background = element_blank(),
+        panel.grid = element_blank(),
+        plot.margin = unit(c(0,0,-1,-1), "cm"))  #T, R, B, L
+
+subplot <- p1 + geom_line(colour = I("grey"),
+                          size = 0.8) + 
+  geom_smooth( ) +
+  geom_text(data = data.frame(), aes(as.Date('1980-01-01'), 600, label = "SP500 Open market price \n1950-2015"),
+            size = 2) # +
+# ggtitle("SP500 Open market price 1950-2015") +
+#theme(plot.title = element_text(lineheight=.8, 
+#                                size = 6,
+#                               face="bold"))
+
+vp <- viewport(width = 0.5, 
+               height = 0.4, 
+               x = .9,
+               y = unit(3, 
+                        "lines"), 
+               just = c("right",
+                        "bottom"))
+
+full <- function() {
+  print(mainplot)
+  theme_set(theme_bw(base_size = 8))
+  theme_white()
+  print(subplot, vp = vp)
+  theme_set(theme_bw())
+}
+
+full()
+
+# write.table(df, 
+#            file = "df.txt",  sep="\t", 
+#            row.names = FALSE, na = "")
+
+```
+
+## SP500 Open Price adjusted with CPI by Month 
+
+```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="CPI adjusted open market price trend Jan 2014 - Jul 2015"}
+
+theme_white()
+
+p <- ggplot(comboData, aes(DateValid, OpenHigh)) + labs(x = NULL,
+                                                    y = ("Open price adjusted with consumer price index (CPI)")) 
+
+mainplot <- p %+%  
+  geom_line(data = subset(comboData, DateValid >= '2014-01-01'), 
+            colour = I("grey"),
+            size = 0.8) + 
+  geom_smooth(data = subset(comboData,  DateValid >= '2014-01-01'),se = FALSE) +
+  scale_y_continuous(labels = comma_format(),
+                     limits=c(7, 9)) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5),
+        axis.title.y = element_text(size = 8, 
+                                    angle = 90),
+        axis.text.y = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5),
+        plot.margin = unit(c(0,0,0,0), "cm"))
+
+p1 <- p + geom_rect(aes(xmin = as.Date('2014-01-01'), 
+                        xmax = max(comboData$DateValid),
+                        ymin = min(OpenHigh, na.rm = TRUE), 
+                        ymax = max(OpenHigh, na.rm = TRUE)),
+                    fill = alpha("lightblue", 0.2)) + 
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks=element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        plot.background = element_blank(),
+        panel.grid = element_blank(),
+        plot.margin = unit(c(0,0,-1,-1), "cm"))  #T, R, B, L
+
+subplot <- p1 + geom_line(colour = I("grey"),
+                          size = 0.8) + 
+  geom_smooth( ) +
+  stat_smooth(method = "lm", color = "red") +
+  geom_text(data = data.frame(), 
+            aes(as.Date('1980-01-01'), 5, 
+                label = "SP500 Open market price \n1950-2015"),
+            size = 2) + 
+  geom_text(data = data.frame(), 
+             aes(as.Date('2000-01-01'), 4, 
+                 label = "Local \nsmoothing"),
+            color = "blue",
+             size = 2)  + 
+  geom_text(data = data.frame(), 
+             aes(as.Date('1968-01-01'), 1, 
+                 label = "Linear smoothing"),
+            color = "red",
+             size = 2)
+
+vp <- viewport(width = 0.5, 
+               height = .5, 
+               x = .9,
+               y = unit(3, 
+                        "lines"), 
+               just = c("right",
+                        "bottom"))
+
+full()
+
+```
+
+## Forecast graphs 1
+
+```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Forecasts"}
+# extract open price from the data
+# first need to resort the data by date
+
+comboData <- comboData[order(as.Date(comboData$DateValid, format="%Y-%m-%d")),]
+
+comboDataOpenPrice <- subset(comboData, DateValid >='2007-01-01',
+                               select = c(Open))
+
+# make the count a time series object
+tsComboDataOpenPrice <- ts(as.vector(comboDataOpenPrice), 
+                     start=c(2000,1), end=c(2015, 8), frequency = 12)
+
+# now complete a foreacast
+# some code is from here
+# http://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r
+
+library(forecast)
+```
+
+```{r, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+x <- tsComboDataOpenPrice
+
+mod_arima = auto.arima(x, ic='aicc', stepwise=FALSE)
+mod_exponential = ets(x, ic='aicc', restrict=FALSE)
+mod_neural = nnetar(x, p=12, size=25)
+mod_tbats = tbats(x, use.parallel=FALSE)
+mod_bats = bats(x, use.parallel=FALSE)
+# mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets')
+# mod_sts = StructTS(x)
+mod_holdWinters = HoltWinters(x, beta=FALSE, gamma=FALSE)
+mod_linear = tslm(x ~ trend + season)
+
+```
+
+```{r plot some graphs, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
+par(mar = rep(2, 4), mfrow=c(3,1))
+
+plot(forecast(mod_arima, 12), include=120)
+plot(forecast(mod_exponential, 12), include=120)
+plot(forecast(mod_neural, 12), include=120)
+
+```
+
+## Forecast graphs 2
+
+```{r plot some graphs2, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Forecasts"}
+par(mar = rep(2, 4), mfrow=c(4,1))
+
+plot(forecast(mod_tbats, 12), include=120)
+
+plot(forecast(mod_bats, 12), include=120)
+# plot(forecast(mod_sts, 12), include=120)
+plot(forecast(mod_holdWinters, 12), include=120)
+plot(forecast(mod_linear, 12), include=120)
+```
+
+
+```{r, cache= TRUE}
+
+# code below is from here
+# http://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r
+
+library(cv.ts)
+ctrl <- tseriesControl(stepSize=1, maxHorizon=12, minObs=36, fixedWindow=TRUE)
+models <- list()
+
+models$arima = cv.ts(
+  tsComboDataOpenPrice, auto.arimaForecast, tsControl=ctrl,
+  ic='aicc', stepwise=FALSE)
+
+models$exp = cv.ts(
+  tsComboDataOpenPrice, etsForecast, tsControl=ctrl,
+  ic='aicc', restrict=FALSE)
+
+models$neural = cv.ts(
+  tsComboDataOpenPrice, nnetarForecast, tsControl=ctrl,
+  nn_p=6, size=5)
+
+# the three models below did not work
+
+# models$tbats = cv.ts(
+#   tsComboDataOpenPrice, tbatsForecast, tsControl=ctrl,
+#   seasonal.periods=12)
+
+# models$bats = cv.ts(
+#  tsComboDataOpenPrice, batsForecast, tsControl=ctrl,
+#  seasonal.periods=12)
+
+# models$stl = cv.ts(
+#  tsComboDataOpenPrice, stl.Forecast, tsControl=ctrl,
+#   s.window=12, ic='aicc', robust=TRUE, method='ets')
+
+models$sts = cv.ts(tsComboDataOpenPrice, stsForecast, tsControl=ctrl)
+
+models$naive = cv.ts(tsComboDataOpenPrice, naiveForecast, tsControl=ctrl)
+
+models$theta = cv.ts(tsComboDataOpenPrice, thetaForecast, tsControl=ctrl)
+
+```
+```{r}
+# Once we've fit the models, we can compare them by MAPE (cv.ts doesn't yet support MASE):
+
+res_overall <- lapply(models, function(x) x$results[13,-1])
+res_overall <- Reduce(rbind, res_overall)
+row.names(res_overall) <- names(models)
+res_overall <- res_overall[order(res_overall[,'MAPE']),]
+res_overall <- round(res_overall, 2)
+
+```
+
+## Forecast table
+
+```{r office capacity, results='asis', message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, include=TRUE, fig.cap="Forecasts"}
+
+options(digits=1)
+Model <- c("naive","theta","exp","arima","sts","neural")
+
+modelTable <- cbind(Model, res_overall)
+
+library(xtable)
+
+print(xtable(prettyNum(modelTable,big.mark=","),
+             digits=1, 
+             caption = "Measure each model's accuracy",  
+             label="tblCity", 
+             # align = "rl{5cm}r{3cm}r{3cm}r{3cm}r{3cm}"
+             ), 
+      caption.placement = "bottom", 
+      include.rownames=TRUE, 
+      # table.placement="t", 
+      comment=FALSE)
+```
+
+## Forecast graphs 3
+
+```{r plot some graphs3, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
+
+library(reshape2)
+library(ggplot2)
+res <- lapply(models, function(x) x$results$MAPE[1:12])
+res <- data.frame(do.call(cbind, res))
+res$horizon <- 1:nrow(res)
+    res <- melt(res, id.var='horizon', variable.name='model', value.name='MAPE')
+    res$model <- factor(res$model, levels=row.names(res_overall))
+ggplot(res, aes(x=horizon, y=MAPE, col=model)) +
+  geom_line(size=1, alpha =1/2) + theme_bw() +
+  theme(legend.position="top") +
+  scale_color_manual(values=c(
+    "#1f78b4", "#ff7f00", "#33a02c", "#6a3d9a",
+    "#e31a1c", "#b15928" ) #, "#a6cee3", "#fdbf6f",
+    # "#b2df8a")
+    )
+
+```
+
+
+```{r echo =FALSE}
+
+#get the time
+endTime <- Sys.time()
+```
+
+## Last Page
+
+\footnotesize
+Disclaimer:
+
+The data available in this presentation, including data, tables, numbers, graphics, and text (hereinafter collectively referred to as the "Information"), is provided AS IS and for you to view, access, copy, distribute and otherwise use the Information at your own risk. Do your own due diligence.
+
+The analysis was completed on `r format(Sys.time(), "%a %b %d %X %Y")
+` in `r round(difftime(endTime, startTime , units = c( "secs")),0)` seconds. 
+
