@@ -405,7 +405,7 @@ plot(forecast(mod_linear, 12), include = 120, cex.main = .8)
 ```
 
 
-```{r newplots, fig.width= 9, fig.height = 4, fig.cap= "newplots.", echo=FALSE, message = FALSE, warning = FALSE, include=TRUE} 
+```{r newplots, fig.width= 9, fig.height = 4, fig.cap= "Forecast plots.", echo=FALSE, message = FALSE, warning = FALSE, include=TRUE} 
 
 
 d.arima <- auto.arima(tsComboDataOpenPrice)
@@ -418,7 +418,13 @@ plotForecast <- autoplot(d.forecast) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plotMod_arima <- autoplot(forecast(mod_arima, 24)) +
   geom_line( aes(y = value),
@@ -426,7 +432,13 @@ plotMod_arima <- autoplot(forecast(mod_arima, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plotMod_exponential <- autoplot(forecast(mod_exponential, 24)) +
   geom_line( aes(y = value),
@@ -434,7 +446,13 @@ plotMod_exponential <- autoplot(forecast(mod_exponential, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 # this one is different
 
@@ -450,15 +468,21 @@ actual <- data.frame(Value = as.matrix(x),
                      date = time(x))
 
 plotMod_neural <- ggplot() +
-    geom_line(data = actual, aes(x = date, y = Value),
-             colour = "grey",
-                            size = 0.5) +
-   geom_line(data = mod_neuralDF, aes(x = date, y = Value),
-             colour = "blue",
-                            size = 0.5) +
-     geom_line(data = mod_neuralDFfitted, aes(x = date, y = Value),
-             colour = "blue",
-                            size = 0.5)
+  geom_line(data = actual, aes(x = date, y = Value),
+            colour = "grey",
+            size = 0.5) +
+  geom_line(data = mod_neuralDF, aes(x = date, y = Value),
+            colour = "blue",
+            size = 0.5) +
+  geom_line(data = mod_neuralDFfitted, aes(x = date, y = Value),
+            colour = "blue",
+            size = 0.5) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5),
+        axis.title.x = element_blank())
 
 
 plotMod_mod_stl <- autoplot(forecast(mod_stl, 24)) +
@@ -467,7 +491,13 @@ plotMod_mod_stl <- autoplot(forecast(mod_stl, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plotMod_mod_sts <- autoplot(forecast(mod_sts, 24)) +
   geom_line( aes(y = value),
@@ -475,7 +505,13 @@ plotMod_mod_sts <- autoplot(forecast(mod_sts, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plotMod_tbats <- autoplot(forecast(mod_tbats, 24)) +
   geom_line( aes(y = value),
@@ -483,7 +519,13 @@ plotMod_tbats <- autoplot(forecast(mod_tbats, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plotMod_bats <- autoplot(forecast(mod_bats, 24)) +
   geom_line( aes(y = value),
@@ -491,7 +533,13 @@ plotMod_bats <- autoplot(forecast(mod_bats, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plotMod_holdWinters <- autoplot(forecast(mod_holdWinters, 24)) +
   geom_line( aes(y = value),
@@ -499,7 +547,13 @@ plotMod_holdWinters <- autoplot(forecast(mod_holdWinters, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plotMod_linear <- autoplot(forecast(mod_linear, 24)) +
   geom_line( aes(y = value),
@@ -507,8 +561,13 @@ plotMod_linear <- autoplot(forecast(mod_linear, 24)) +
                            size = 0.5) +
     geom_line( aes(y = Fitted),
             colour = "blue",
-                           size = 0.5)
-
+                           size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
 
 plot_grid(plotForecast,
           plotMod_arima,
@@ -525,15 +584,17 @@ plot_grid(plotForecast,
                      "Exponential",
                      "TBATS",
                      "BATS",
-                     "plotMod_neural",
-                     "plotMod_mod_stl",
-                     "plotMod_mod_sts",
+                     "Neural",
+                     "STL",
+                     "STS",
                      "HoldWinters",
                      "Linear"),
           label_size = 5,
           ncol = 5,
           rel_widths = .5,
-          rel_heights = 1)
+          rel_heights = 1,
+          hjust = -2.0,
+          vjust = 1)
 
 ```
 
