@@ -1,7 +1,7 @@
 ---
 title: "SP500 forecast"
 author: "Moises Evangelista"
-date: "August 26, 2015"
+date: "Prepared `r format(Sys.time(), '%B %d, %Y')`"
 output: 
   beamer_presentation:
     theme: "AnnArbor"
@@ -35,56 +35,61 @@ rm(list = ls(all = TRUE)) #start with empty workspace
 startTime <- Sys.time()
 
 
-setwd("~/GitHub/SP500-Forecast/") # set the working directory
-list.files() # see whats there
 library(knitr)
 library(RCurl)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(scales)
+library(grid)
+library(tidyr)
+library(forecast)
+library(reshape2)
+library(cv.ts)
+library(cowplot)
+# library(devtools)
+# install_github('sinhrks/ggfortify')
+library(ggfortify)
+
+setwd("~/GitHub/SP500-Forecast/") # set the working directory
+list.files() # see whats there
 
 ```
 
-```{r import data, echo = FALSE, message = FALSE, cache=TRUE}
+```{r import data, echo = FALSE, message = FALSE, cache=TRUE, warning=FALSE, include=FALSE}
 
-x <- getURL("http://real-chart.finance.yahoo.com/table.csv?s=%5EGSPC&a=00&b=3&c=1950&d=07&e=26&f=2015&g=m&ignore=.csv")
+linkSp500 <- "http://real-chart.finance.yahoo.com/table.csv?s=%5EGSPC&a=00&b=3&c=1950&d=07&e=26&f=2016&g=m&ignore=.csv"
 
-SP500MonthlyData <- read.csv(text = x)
-
-# the date is a factor so conver it to date
-
-SP500MonthlyData$DateValid <- as.Date(SP500MonthlyData$Date, format = "%Y-%m-%d")
-
-SP500MonthlyData$Year <- as.integer(format(SP500MonthlyData$DateValid, "%Y"))
-
-SP500MonthlyData$Period <- as.integer(format(SP500MonthlyData$DateValid, "%m"))
+SP500MonthlyData <- fread(linkSp500,
+                          data.table = FALSE) %>%
+  mutate(Date = as.Date(Date, format = "%Y-%m-%d"),
+         Year = as.integer(format(Date, "%Y")),
+         Period = as.integer(format(Date, "%m")))
 
 # import csv data. 
 # data is from here, but saved locally
 # http://data.bls.gov/pdq/SurveyOutputServlet or http://data.bls.gov/cgi-bin/surveymost
+# data info is here http://www.bls.gov/cpi/#tables
 
-ConsumerPriceIndexAllUrbanConsumers <- read.table("Consumer Price Index - All Urban Consumers.txt",
-                                                  header = TRUE, sep =",")
+CpiLink <- "http://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems"
 
-library(dplyr)
+ConsumerPriceIndexAllUrbanConsumersMonths <- fread(CpiLink,
+                                                   data.table = FALSE) %>% 
+  filter(  grepl('M', period)) %>%
+  filter(year >= 1950,
+         series_id == "CUUR0000SA0") %>%
+  mutate(period = as.integer(gsub("M","", period)))
 
-# remove records that are not for month periods or before 1950
+comboData <- left_join(SP500MonthlyData, ConsumerPriceIndexAllUrbanConsumersMonths,
+                       by = c("Year" = "year",
+                              "Period" = "period")) %>%
+  mutate(OpenHigh = (Open/value)*100,
+         OpenHighLog  = log10(OpenHigh)) %>%
+  filter(!is.na(OpenHighLog))
 
-ConsumerPriceIndexAllUrbanConsumersMonths <- ConsumerPriceIndexAllUrbanConsumers %>% 
-  filter(  grepl('M', Period)) %>%
-  filter(Year >= 1950)
+summary(comboData)
+str(comboData)
 
-# extract the numeric part of the month
-
-ConsumerPriceIndexAllUrbanConsumersMonths$Period <- as.integer(gsub("M","", 
-                                                                        ConsumerPriceIndexAllUrbanConsumersMonths$Period))
-
-comboData <- left_join(SP500MonthlyData, ConsumerPriceIndexAllUrbanConsumersMonths)
-
-# create a field with adjusted values
-
-comboData$OpenHigh <- comboData$Open/comboData$Value
-
-# get a log value from the preciding field
-
-comboData$OpenHighLog <- log10(comboData$OpenHigh)
 
 ```
 
@@ -92,17 +97,13 @@ comboData$OpenHighLog <- log10(comboData$OpenHigh)
 
 ```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Open market price trend Jan 2014 - Jul 2015"}
 
-library(ggplot2)
-library(scales)
-library(grid)
-
 options(digits = 2)
 
 # get the end and start dates of the data
-end <- max(comboData$DateValid)
-start <- min(comboData$DateValid)
+end <- max(comboData$Date)
+start <- min(comboData$Date)
 
-endRecent <- as.Date('2015-07-31')
+endRecent <- max(comboData$Date)
 startRecent <- as.Date('2015-01-01')
 
 # code is from here
@@ -116,15 +117,21 @@ theme_set(theme_bw())
 
 theme_white()
 
-p <- ggplot(comboData, aes(DateValid, Open)) + labs(x = NULL,
+p <- ggplot(comboData, aes(Date, Open)) + labs(x = NULL,
                                                     y = ("Open Price")) 
 
 mainplot <- p %+%  
   geom_line(data = comboData,
-            colour = I("grey"),
-            size = 0.8) + 
-  geom_smooth(data = comboData, se = FALSE) +
-  coord_cartesian(xlim = as.Date(c("2014-01-01", "2015-08-03"))) +
+            colour = "grey",
+            size = 0.53) + 
+  geom_line(stat = "smooth",method = "loess", color = "blue",
+            size = .5,
+            alpha = 0.5) +
+  geom_ribbon(stat = 'smooth', method = "loess", 
+              se = TRUE,
+              alpha = 0.1, 
+              aes(color = NULL)) +
+  coord_cartesian(xlim = as.Date(c("2014-01-01", "2016-05-02"))) +
   scale_y_continuous(labels = comma_format(),
                      # limits=c(1500, 2200)
   ) +
@@ -143,7 +150,7 @@ mainplot <- p %+%
         plot.margin = unit(c(0,0,0,0), "cm"))
 
 p1 <- p + geom_rect(aes(xmin = as.Date('2014-01-01'), 
-                        xmax = max(comboData$DateValid),
+                        xmax = max(comboData$Date),
                         ymin = min(Open, na.rm = TRUE), 
                         ymax = max(Open, na.rm = TRUE)),
                     fill = alpha("lightblue", 0.2)) + 
@@ -151,17 +158,26 @@ p1 <- p + geom_rect(aes(xmin = as.Date('2014-01-01'),
         # axis.text.x = element_blank(),
         axis.title.y = element_blank(),
         axis.text.y = element_blank(),
-        axis.ticks = element_blank(),
+        axis.ticks.y = element_blank(),
         # panel.border = element_blank(),
         panel.background = element_blank(),
         plot.background = element_blank(),
         panel.grid = element_blank(),
         plot.margin = unit(c(0,0,-1,-1), "cm"))  #T, R, B, L
 
-subplot <- p1 + geom_line(colour = I("grey"),
-                          size = 0.8) + 
-  geom_smooth( ) +
-  geom_text(data = data.frame(), aes(as.Date('1980-01-01'), 600, label = "SP500 Open market price \n1950-2015"),
+
+subplot <- p1 + geom_line( colour = "grey",
+                           size = 0.53) + 
+  geom_line(stat = "smooth",method = "loess", color = "blue",
+            size = .5,
+            alpha = 0.5) +
+  geom_ribbon(stat = 'smooth', method = "loess", 
+              se = TRUE,
+              alpha = 0.1, 
+              aes(color = NULL)) +
+  geom_text(data = data.frame(), aes(as.Date('1980-01-01'),
+                                     600,
+                                     label = "SP500 Open market price \n1950-2016"),
             size = 2) # +
 # ggtitle("SP500 Open market price 1950-2015") +
 #theme(plot.title = element_text(lineheight=.8, 
@@ -194,21 +210,33 @@ full()
 
 ## SP500 Open Price adjusted with CPI by Month 
 
-```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="CPI adjusted open market price trend Jan 2014 - Jul 2015"}
+```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="CPI adjusted open market price trend Jan 2014 - May 2016"}
 
 theme_white()
 
-p <- ggplot(comboData, aes(DateValid, OpenHigh)) + 
+p <- ggplot(comboData, aes(Date, OpenHigh)) + 
   labs(x = NULL,
        y = ("Open price adjusted with consumer price index (CPI)")) 
 
 mainplot <- p %+%  
   geom_line(data = comboData,
-            colour = I("grey"),
-            size = 0.8) + 
-  geom_smooth(data = comboData, se = FALSE) +
-  stat_smooth(method = "lm", color = "red") +
-  coord_cartesian(xlim = as.Date(c("2014-01-01", "2015-08-03"))) +
+            colour = "grey",
+            size = 0.53) + 
+  geom_line(stat = "smooth",method = "loess", color = "blue",
+            size = .5,
+            alpha = 0.5) +
+  geom_ribbon(stat = 'smooth', method = "loess", 
+              se = TRUE,
+              alpha = 0.1, 
+              aes(color = NULL)) +
+  geom_line(stat = "smooth",method = "lm", color = "red",
+            size = .5,
+            alpha = 0.5) +
+  geom_ribbon(stat = 'smooth', method = "lm", 
+              se = TRUE,
+              alpha = 0.1, 
+              aes(color = NULL)) +
+  coord_cartesian(xlim = as.Date(c("2014-01-01", "2016-05-02"))) +
   scale_y_continuous(labels = comma_format(),
                      # limits=c(1500, 2200)
   ) +
@@ -227,42 +255,54 @@ mainplot <- p %+%
         plot.margin = unit(c(0,0,0,0), "cm"))
 
 p1 <- p + geom_rect(aes(xmin = as.Date('2014-01-01'), 
-                        xmax = max(comboData$DateValid),
+                        xmax = max(comboData$Date),
                         ymin = min(OpenHigh, na.rm = TRUE), 
                         ymax = max(OpenHigh, na.rm = TRUE)),
                     fill = alpha("lightblue", 0.2)) + 
   theme(axis.title.x = element_blank(),
         # axis.text.x = element_blank(),
         axis.title.y = element_blank(),
-        # axis.text.y = element_blank(),
-        axis.ticks = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
         # panel.border = element_blank(),
         panel.background = element_blank(),
         plot.background = element_blank(),
         panel.grid = element_blank(),
         plot.margin = unit(c(0,0,-1,-1), "cm"))  #T, R, B, L
 
-subplot <- p1 + geom_line(colour = I("grey"),
-                          size = 0.8) + 
-  geom_smooth( ) +
-  stat_smooth(method = "lm", color = "red") +
+subplot <- p1 + geom_line( colour = "grey",
+                           size = 0.53) + 
+  geom_line(stat = "smooth",method = "loess", color = "blue",
+            size = .5,
+            alpha = 0.5) +
+  geom_ribbon(stat = 'smooth', method = "loess", 
+              se = TRUE,
+              alpha = 0.1, 
+              aes(color = NULL)) +
+  geom_line(stat = "smooth",method = "lm", color = "red",
+            size = .5,
+            alpha = 0.5) +
+  geom_ribbon(stat = 'smooth', method = "lm", 
+              se = TRUE,
+              alpha = 0.1, 
+              aes(color = NULL)) +
   geom_text(data = data.frame(), 
-            aes(as.Date('1980-01-01'), 5, 
-                label = "SP500 Open market price \n1950-2015"),
+            aes(as.Date('1985-01-01'), 700, 
+                label = "SP500 Open market price \n1950-2016"),
             size = 2) + 
   geom_text(data = data.frame(), 
-            aes(as.Date('2000-01-01'), 4, 
+            aes(as.Date('2000-03-01'), 390, 
                 label = "Local \nsmoothing"),
             color = "blue",
             size = 2)  + 
   geom_text(data = data.frame(), 
-            aes(as.Date('1968-01-01'), 1, 
-                label = "Linear smoothing"),
+            aes(as.Date('1968-01-01'), 100, 
+                label = "Linear \nsmoothing"),
             color = "red",
             size = 2)
 
 vp <- viewport(width = 0.5, 
-               height = .5, 
+               height = .45, 
                x = .9,
                y = unit(3, 
                         "lines"), 
@@ -279,20 +319,35 @@ full()
 # extract open price from the data
 # first need to resort the data by date
 
-comboData <- comboData[order(as.Date(comboData$DateValid, format = "%Y-%m-%d")),]
+comboDataOpenPrice <- comboData %>% arrange(Date) %>%
+  subset( Date >='1995-01-01',
+                               select = c(Open, Date))
 
-comboDataOpenPrice <- subset(comboData, DateValid >='2007-01-01',
-                               select = c(Open))
+dates <- comboData %>% arrange(Date) %>%
+  subset( Date >='1995-01-01',
+                               select = c( Date)) %>%
+      summarise(minYear = min(Date),
+              maxYear = max(Date)) %>%
+    gather(key, value) %>%
+    mutate(YearValue = as.numeric(format(value,'%Y')),
+           MonthValue = as.numeric(format(value,'%m')))
+  
+  MinYear <- dates[1, 3] # row 1 col 3
+  MinMonth <- dates[1, 4] # row 1 col 4
+  MaxYear <- dates[2, 3]
+  MaxMonth <- dates[2, 4]
 
 # make the count a time series object
-tsComboDataOpenPrice <- ts(as.vector(comboDataOpenPrice), 
-                     start = c(2000,1), end = c(2015, 8), frequency = 12)
+tsComboDataOpenPrice <- ts(as.vector(comboDataOpenPrice$Open), 
+                     start = c(MinYear,
+                               MinMonth), 
+                     end = c(MaxYear, MaxMonth), frequency = 12)
+
 
 # now complete a foreacast
 # some code is from here
 # http://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r
 
-library(forecast)
 
 ```
 
@@ -309,8 +364,12 @@ mod_neural = nnetar(x, p = 12, size = 25)
 mod_tbats = tbats(x, use.parallel = FALSE)
 
 mod_bats = bats(x, use.parallel = FALSE)
-# mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets')
-# mod_sts = StructTS(x)
+
+
+mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets')
+ 
+ 
+mod_sts = StructTS(x)
 
 mod_holdWinters = HoltWinters(x, beta = FALSE, gamma = FALSE)
 
@@ -318,7 +377,7 @@ mod_linear = tslm(x ~ trend + season)
 
 ```
 
-```{r plot some graphs, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4}
+```{r plot some graphs, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=4, eval=FALSE}
 
 par(mar = rep(2, 4),
     cex.axis = .5,
@@ -346,12 +405,142 @@ plot(forecast(mod_linear, 12), include = 120, cex.main = .8)
 ```
 
 
-```{r, cache= TRUE}
+```{r newplots, fig.width= 9, fig.height = 4, fig.cap= "newplots.", echo=FALSE, message = FALSE, warning = FALSE, include=TRUE} 
+
+
+d.arima <- auto.arima(tsComboDataOpenPrice)
+
+d.forecast <- forecast(d.arima, level = c(95), h = 24)
+
+plotForecast <- autoplot(d.forecast) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+plotMod_arima <- autoplot(forecast(mod_arima, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+plotMod_exponential <- autoplot(forecast(mod_exponential, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+# this one is different
+
+mod_neural <- forecast(mod_neural, 24)
+
+mod_neuralDF <- data.frame(Value = as.matrix(mod_neural$mean), 
+                           date = time(mod_neural$mean))
+
+mod_neuralDFfitted <- data.frame(Value = as.matrix(mod_neural$fitted),
+                                 date = time(mod_neural$fitted))
+
+actual <- data.frame(Value = as.matrix(x), 
+                     date = time(x))
+
+plotMod_neural <- ggplot() +
+    geom_line(data = actual, aes(x = date, y = Value),
+             colour = "grey",
+                            size = 0.5) +
+   geom_line(data = mod_neuralDF, aes(x = date, y = Value),
+             colour = "blue",
+                            size = 0.5) +
+     geom_line(data = mod_neuralDFfitted, aes(x = date, y = Value),
+             colour = "blue",
+                            size = 0.5)
+
+
+plotMod_mod_stl <- autoplot(forecast(mod_stl, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+plotMod_mod_sts <- autoplot(forecast(mod_sts, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+plotMod_tbats <- autoplot(forecast(mod_tbats, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+plotMod_bats <- autoplot(forecast(mod_bats, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+plotMod_holdWinters <- autoplot(forecast(mod_holdWinters, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+plotMod_linear <- autoplot(forecast(mod_linear, 24)) +
+  geom_line( aes(y = value),
+            colour = "grey",
+                           size = 0.5) +
+    geom_line( aes(y = Fitted),
+            colour = "blue",
+                           size = 0.5)
+
+
+plot_grid(plotForecast,
+          plotMod_arima,
+          plotMod_exponential,
+          plotMod_tbats,
+          plotMod_bats,
+          plotMod_neural,
+          plotMod_mod_stl,
+          plotMod_mod_sts,
+          plotMod_holdWinters,
+          plotMod_linear,
+          labels = c("Forecast",
+                     "ARIMA",
+                     "Exponential",
+                     "TBATS",
+                     "BATS",
+                     "plotMod_neural",
+                     "plotMod_mod_stl",
+                     "plotMod_mod_sts",
+                     "HoldWinters",
+                     "Linear"),
+          label_size = 5,
+          ncol = 5,
+          rel_widths = .5,
+          rel_heights = 1)
+
+```
+
+```{r, cache= TRUE, echo=FALSE, warning= FALSE}
 
 # code below is from here
 # http://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r
-
-library(cv.ts)
 
 ctrl <- tseriesControl(stepSize = 1, maxHorizon = 12, minObs = 36, fixedWindow = TRUE)
 
@@ -409,6 +598,7 @@ res_overall <- round(res_overall, 2)
 
 ```{r office capacity, results='asis', message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, include=TRUE, fig.cap="Forecasts"}
 
+
 options(digits = 1)
 
 Model <- c("naive",
@@ -439,10 +629,6 @@ print(xtable(modelTable,
 ## Forecast graphs 2
 
 ```{r plot some graphs3, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
-
-library(reshape2)
-
-library(ggplot2)
 
 res <- lapply(models, function(x) x$results$MAPE[1:12])
 
