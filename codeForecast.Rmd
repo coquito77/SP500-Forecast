@@ -1,15 +1,17 @@
 ---
 title: "SP500 forecast"
 author: "Moises Evangelista"
-date: "August 26, 2015"
+date:  "Prepared `r format(Sys.time(), '%B %d, %Y')`"
 output: 
   beamer_presentation:
-    theme: "AnnArbor"
+    theme: "Boadilla "
     fonttheme: "serif"
     fig_width: 7
     fig_height: 6
     fig_caption: true
     fig_crop: false
+header-includes:
+- \setbeamerfont{footline}{size=\fontsize{4}{12}\selectfont}
 ---
 
 ## Introduction
@@ -31,14 +33,19 @@ In conclusion, it seems that the Index is currently overpriced.
 
 ```{r echo=FALSE, message = FALSE, include=FALSE}
 
-rm(list=ls(all=TRUE)) #start with empty workspace
+rm(list = ls(all = TRUE)) #start with empty workspace
+
 startTime <- Sys.time()
 
-
-setwd("C:/Users/E551910/Desktop/SP500-Forecast/") # set the working directory
+setwd("~/GitHub/SP500-Forecast/") # set the working directory
 list.files() # see whats there
 library(knitr)
 library(RCurl)
+library(rvest)
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+
 ```
 
 ```{r import data, echo =FALSE, message = FALSE, cache=TRUE}
@@ -84,11 +91,13 @@ comboData$OpenHigh <- comboData$Open/comboData$Value
 # get a log value from the preciding field
 
 comboData$OpenHighLog <- log10(comboData$OpenHigh )
+
 ```
 
 ## SP500 Open Price by Month 
 
 ```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Open market price trend Jan 2014 - Jul 2015"}
+
 library(ggplot2)
 library(scales)
 library(grid)
@@ -109,6 +118,7 @@ theme_white <- function() {
   theme_update(panel.background = element_blank(),
                panel.grid.major = element_blank())
 }
+
 theme_set(theme_bw())
 
 theme_white()
@@ -117,12 +127,14 @@ p <- ggplot(comboData, aes(DateValid, Open)) + labs(x = NULL,
                                                     y = ("Open Price")) 
 
 mainplot <- p %+%  
-  geom_line(data = subset(comboData, DateValid >= '2014-01-01'), 
-            colour = I("grey"),
-            size = 0.8) + 
-  geom_smooth(data = subset(comboData,  DateValid >= '2014-01-01'), se = FALSE) +
-  scale_y_continuous(labels = comma_format(),
-                     limits=c(1500, 2200)) +
+  geom_line(data = comboData,
+    colour = I("grey"),
+    size = 0.8) + 
+  geom_smooth(data = comboData, se = FALSE) +
+coord_cartesian(xlim = as.Date(c("2014-01-01", "2015-08-03"))) +
+scale_y_continuous(labels = comma_format(),
+                   # limits=c(1500, 2200)
+) +
   theme(axis.title.x = element_text(size = 8, 
                                     angle = 00),
         axis.text.x = element_text(colour = "black", 
@@ -137,18 +149,17 @@ mainplot <- p %+%
                                    vjust = .5),
         plot.margin = unit(c(0,0,0,0), "cm"))
 
-
 p1 <- p + geom_rect(aes(xmin = as.Date('2014-01-01'), 
                         xmax = max(comboData$DateValid),
                         ymin = min(Open, na.rm = TRUE), 
                         ymax = max(Open, na.rm = TRUE)),
                     fill = alpha("lightblue", 0.2)) + 
   theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank(),
+        # axis.text.x = element_blank(),
         axis.title.y = element_blank(),
         axis.text.y = element_blank(),
         axis.ticks=element_blank(),
-        panel.border = element_blank(),
+        # panel.border = element_blank(),
         panel.background = element_blank(),
         plot.background = element_blank(),
         panel.grid = element_blank(),
@@ -198,12 +209,15 @@ p <- ggplot(comboData, aes(DateValid, OpenHigh)) + labs(x = NULL,
                                                     y = ("Open price adjusted with consumer price index (CPI)")) 
 
 mainplot <- p %+%  
-  geom_line(data = subset(comboData, DateValid >= '2014-01-01'), 
-            colour = I("grey"),
-            size = 0.8) + 
-  geom_smooth(data = subset(comboData,  DateValid >= '2014-01-01'),se = FALSE) +
-  scale_y_continuous(labels = comma_format(),
-                     limits=c(7, 9)) +
+  geom_line(data = comboData,
+    colour = I("grey"),
+    size = 0.8) + 
+  geom_smooth(data = comboData, se = FALSE) +
+  stat_smooth(method = "lm", color = "red") +
+coord_cartesian(xlim = as.Date(c("2014-01-01", "2015-08-03"))) +
+scale_y_continuous(labels = comma_format(),
+                   # limits=c(1500, 2200)
+) +
   theme(axis.title.x = element_text(size = 8, 
                                     angle = 00),
         axis.text.x = element_text(colour = "black", 
@@ -224,11 +238,11 @@ p1 <- p + geom_rect(aes(xmin = as.Date('2014-01-01'),
                         ymax = max(OpenHigh, na.rm = TRUE)),
                     fill = alpha("lightblue", 0.2)) + 
   theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank(),
+        # axis.text.x = element_blank(),
         axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
+        # axis.text.y = element_blank(),
         axis.ticks=element_blank(),
-        panel.border = element_blank(),
+        # panel.border = element_blank(),
         panel.background = element_blank(),
         plot.background = element_blank(),
         panel.grid = element_blank(),
@@ -380,7 +394,7 @@ res_overall <- round(res_overall, 2)
 
 ## Forecast table
 
-```{r office capacity, results='asis', message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, include=TRUE, fig.cap="Forecasts"}
+```{r tableForecasts, results='asis', message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, include=TRUE, fig.cap="Forecasts"}
 
 options(digits=1)
 Model <- c("naive","theta","exp","arima","sts","neural")
@@ -389,14 +403,15 @@ modelTable <- cbind(Model, res_overall)
 
 library(xtable)
 
-print(xtable(prettyNum(modelTable,big.mark=","),
+print(xtable(modelTable,
              digits=1, 
              caption = "Measure each model's accuracy",  
              label="tblCity", 
              # align = "rl{5cm}r{3cm}r{3cm}r{3cm}r{3cm}"
              ), 
       caption.placement = "bottom", 
-      include.rownames=TRUE, 
+      include.rownames=TRUE,
+      format.args = list(big.mark = ",", decimal.mark = "."),
       # table.placement="t", 
       comment=FALSE)
 ```
@@ -423,6 +438,319 @@ ggplot(res, aes(x=horizon, y=MAPE, col=model)) +
 
 ```
 
+
+```{r getPresidentialInagurations, include=FALSE, cache = TRUE, warning=FALSE}
+
+### scrape the presidetial inagurations from wikipedia 'the historical version'
+
+listOfPresidentailInagurations <- read_html("https://en.wikipedia.org/w/index.php?title=United_States_presidential_inauguration&diff=prev&oldid=750252323") %>%
+  html_table(fill = TRUE) %>%
+  .[[7]] %>% # table 6 only
+  mutate(Date = as.Date(Date, format  = "%b %d, %Y"),
+         SixMonthsLaterYear = as.numeric(format(Date,'%Y')),
+         Event = gsub("inauguration", "term",Event),
+         Event = gsub("Inauguration", "First term", Event),
+         Event = gsub("(\\[).*","", Event, perl = TRUE)) %>% # remove the stuff after the '[' symbol
+  filter(Date >= "1960-01-01") %>%
+  filter(grepl("-01-", Date)) %>%
+  dplyr::select(Date, Event, SixMonthsLaterYear)
+
+# the U.s. elections are on 
+# the fist Tuesday after the first Montday in Nov
+# the fuction below is from here 
+# http://stackoverflow.com/questions/13448588/find-first-tuesday-of-month
+
+```
+
+```{r getS&P500PresidentialChange, include=FALSE, cache = FALSE, warning=FALSE}
+
+# the fuction below is from here
+# http://stackoverflow.com/questions/13448588/find-first-tuesday-of-month
+
+ firstDayOfMonth <- function(dates, day="Mon", abbreviate=TRUE) {
+  # first 7 days of month
+  s <- lapply(as.Date(format(dates,"%Y-%m-01")), seq, by = "day", length.out=7)
+  # first day of month
+  d <- lapply(s, function(d) d[weekdays(d,abbreviate) == day])
+  # unlist converts to atomic, so use do.call(c,...) instead
+  do.call(c, d)
+}
+
+# built list of links to scrape Yahoo S&P 500 data
+
+ElectionYears <- data.frame(ElectionMOnth = seq(as.Date("1960/11/1"), as.Date("2016/11/1"),  by = "4 years"),
+                            ElectionYear = seq(from = 1960, to = 2016, by = 4),
+                            SixMonthsLaterYear =  seq(from = 1960+1, to = 2017, by = 4)) %>%
+  mutate(link = paste0('http://chart.finance.yahoo.com/table.csv?s=^GSPC&a=5&b=1&c=',ElectionYear,
+                       '&d=5&e=1&f=',SixMonthsLaterYear,'&g=d&ignore=.csv'),
+         ElectionDay = firstDayOfMonth(as.Date(ElectionMOnth),
+                                       "Monday", FALSE)+1)  # get the first Monday in Nov then add a day
+
+links <- as.character(unique(trimws(ElectionYears$link))) # get a list of links
+
+electionDays <- ElectionYears$ElectionDay # get a list of election days
+
+# create a list of lists to populate
+
+all_tables <- vector("list", length = (length(links)))
+
+strt <- Sys.time() # get the start time
+
+for(i in 1:length(links)){
+  print(i)
+  # error handling - skips to next URL if it gets an error
+  result <- try(
+    all_tables[[i]] <-  read.csv(links[i], 
+                                 header = TRUE, 
+                                 fill = TRUE) %>%
+      mutate(ElectionDay = electionDays[i])
+  ); if(class(result) == "try-error") next;
+}
+
+print(Sys.time() - strt) # get time to import
+
+t <- plyr::ldply(all_tables, data.frame)
+
+# on the data calc the diff of days
+
+t <- t %>%
+  mutate(DaysElapsed = round(as.numeric(
+           difftime(as.Date(Date), ElectionDay,
+                    units = c("days"))),0),
+         ElectionYear  = strftime(ElectionDay, format = "%Y"),
+         SixMonthsLaterYear = as.Date(ElectionDay)+60,
+         SixMonthsLaterYear = as.numeric(format(SixMonthsLaterYear,'%Y'))) %>%
+  left_join(listOfPresidentailInagurations,
+            by = "SixMonthsLaterYear")
+
+ValueOneDayAfterElection <- t %>% group_by(ElectionYear) %>%
+  na.omit() %>%
+  filter(DaysElapsed > 0) %>% 
+  filter(DaysElapsed == min(DaysElapsed)) %>%
+  dplyr::select(ElectionYear, OpenValueAtElection = Open) %>% 
+  droplevels()
+
+t <- t %>% 
+  left_join(ValueOneDayAfterElection) %>% 
+  mutate(PercentChange = ((Open-OpenValueAtElection)/Open)*100)
+
+```
+
+
+## PresidentialChart 1
+
+```{r plotPresidentialElection, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="first plot"}
+
+MaxPoint <-  t  %>% group_by(ElectionYear) %>%
+  na.omit() %>%
+  filter(DaysElapsed == max(DaysElapsed)) %>%
+  droplevels()
+
+MaxPoint <-  t  %>% group_by(ElectionYear) %>%
+  na.omit() %>%
+  filter(DaysElapsed == max(DaysElapsed)) %>%
+  droplevels()
+
+InagurationPoint <-  t  %>% 
+  mutate(DaysElapsedInguration = round(as.numeric(
+           difftime(as.Date(Date.x), Date.y,
+                    units = c("days"))),0)) %>% 
+  filter(DaysElapsedInguration >= 0) %>% 
+  group_by(ElectionYear) %>%
+  filter(DaysElapsedInguration == min(DaysElapsedInguration))
+ 
+colourCount = length(unique(t$ElectionYear))
+getPalette = colorRampPalette(brewer.pal(8, "Accent"))
+
+t %>% #filter(Years == 2015) %>% droplevels() %>%
+  ggplot(aes(x = DaysElapsed,
+             y = Open,
+             colour = as.factor(ElectionYear)
+             )) + 
+  scale_y_log10() +
+  geom_line(alpha = 0.5) +
+  geom_text(data = MaxPoint,
+            aes(label = Event),
+            vjust = 1, 
+            hjust = 1,
+            size = 1,
+            check_overlap = TRUE) +
+  scale_colour_manual(values = getPalette(colourCount),
+                    name = "",
+                      guide = guide_legend(reverse = TRUE,
+                                           keywidth = 1,
+                                           keyheight = .5,
+                                           direction = "vertical",
+                                           title.position = "top",
+                                           label.position = "top", 
+                                           label.hjust = 0, 
+                                           label.vjust = 0, 
+                                           ncol = 2, 
+                                           byrow = TRUE,
+                                           title.theme = element_text(size = 5, 
+                                                                      colour = "black", 
+                                                                      angle = 00),
+                                           label.theme = element_text(size = 5, 
+                                                                      colour = "black", 
+                                                                      angle = 00)))
+
+```
+
+## PresidentialChart 2
+
+```{r plotPresidentialElection2, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="second plot"}
+
+
+t %>% #filter(Years == 2015) %>% droplevels() %>%
+  ggplot(aes(x = DaysElapsed,
+             y = PercentChange,
+             colour = as.factor(ElectionYear))) + 
+  #scale_y_log10() +
+  geom_line() +
+  geom_text(data = MaxPoint,
+            aes(label = Event),
+            vjust = 1, 
+            hjust = 1,
+            size = 1,
+            check_overlap = TRUE) +
+  geom_point(data = InagurationPoint, size = .5, colour = "blue", fill = "blue") +
+    scale_linetype_discrete(name = 'Discharge \nCohort',
+                          guide = guide_legend(keywidth = 1,
+                                               keyheight = .5,
+                                               direction = "vertical",
+                                               title.position = "left",
+                                               label.position = "top",
+                                               label.hjust = 0,
+                                               label.vjust = 0,
+                                               ncol = 2,
+                                               byrow = TRUE,
+                                               title.theme = element_text(size = 10,
+                                                                          colour = "black",
+                                                                          angle = 00),
+                                               label.theme = element_text(size = 10,
+                                                                          colour = "black",
+                                                                          angle = 00))) +
+  scale_colour_manual(name = 'Discharge \nCohort', 
+                      values = c("#7FC97F","#9EBBA9","#BEAED4","#DDB7AD",
+                                 "#FDC086","#FEDF8F","#FFFF99","#9BB5A4","#386CB0",
+                                 "#933797","#F0027F","#D72E4A","#BF5B17","#92603E","#000000"),
+                      #values = getPalette(colourCount),
+                      guide = guide_legend(keywidth = 1,
+                                           keyheight = .5,
+                                           direction = "vertical",
+                                           title.position = "top",
+                                           label.position = "top", 
+                                           label.hjust = 0, 
+                                           label.vjust = 0, 
+                                           ncol = 2, 
+                                           byrow = TRUE,
+                                           title.theme = element_text(size = 5, 
+                                                                      colour = "black", 
+                                                                      angle = 00),
+                                           label.theme = element_text(size = 5, 
+                                                                      colour = "black", 
+                                                                      angle = 00)))
+
+
+```
+
+## PresidentialChart 3
+
+```{r plotPresidentialElection3, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="third plot"}
+
+
+t2 <- t %>% filter(as.Date(ElectionDay) >= "1990-01-01")
+
+
+MaxPoint <-  t2  %>% group_by(ElectionYear) %>%
+  na.omit() %>%
+  filter(DaysElapsed == max(DaysElapsed)) %>%
+  droplevels()
+
+InagurationPoint <-  t2  %>% 
+  mutate(DaysElapsedInguration = round(as.numeric(
+           difftime(as.Date(Date.x), Date.y,
+                    units = c("days"))),0)) %>% 
+  filter(DaysElapsedInguration >= 0) %>% 
+  group_by(ElectionYear) %>%
+  filter(DaysElapsedInguration == min(DaysElapsedInguration))
+
+colourCount = length(unique(t2$ElectionYear))
+getPalette = colorRampPalette(brewer.pal(8, "Accent"))
+
+
+t2 %>% 
+  mutate(lineSize = ifelse(Event == "Inauguration of Donald Trump",2,1 )) %>% 
+  ggplot(aes(x = DaysElapsed,
+             y = PercentChange,
+             colour = as.factor(ElectionYear))) + 
+  #scale_y_log10() +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  geom_vline(xintercept = 0, linetype = "dotted") +
+  geom_line(aes(size = as.factor(ElectionYear))) +  
+  scale_size_manual(values = c(
+    0.5,0.5,0.5,0.5,0.5,0.5,1
+  ), guide = "none") +
+  geom_text(data = MaxPoint,
+            aes(label = Event),
+            vjust = 1, 
+            hjust = 1,
+            size = 1,
+            check_overlap = TRUE) +
+  geom_point(data = InagurationPoint, size = .5, colour = "blue", fill = "blue") +
+  scale_linetype_discrete(name = 'Election \nYear',
+                          guide = guide_legend(keywidth = 1,
+                                               keyheight = .5,
+                                               direction = "vertical",
+                                               title.position = "top",
+                                               label.position = "right",
+                                               label.hjust = 0,
+                                               label.vjust = 0,
+                                               ncol = 1,
+                                               byrow = TRUE,
+                                               title.theme = element_text(size = 5,
+                                                                          colour = "black",
+                                                                          angle = 00),
+                                               label.theme = element_text(size = 5,
+                                                                          colour = "black",
+                                                                          angle = 00))) +
+  scale_colour_manual(name = 'Election \nYear',
+                      #values = c("#7FC97F","#9EBBA9","#BEAED4","#DDB7AD",
+                      #          "#FDC086"),
+                      values = getPalette(colourCount),
+                      guide = guide_legend(keywidth = 1,
+                                           keyheight = .5,
+                                           direction = "vertical",
+                                           title.position = "top",
+                                           label.position = "right", 
+                                           label.hjust = 0, 
+                                           label.vjust = 0, 
+                                           ncol = 1, 
+                                           byrow = TRUE,
+                                           title.theme = element_text(size = 5, 
+                                                                      colour = "black", 
+                                                                      angle = 00),
+                                           label.theme = element_text(size = 5, 
+                                                                      colour = "black", 
+                                                                      angle = 00)))
+
+
+# save the plot as PDF and png formats
+
+ggsave("./plotSPAndPresidentialElections.pdf", width = 40, height = 40, units = "cm", device = cairo_pdf)
+ggsave("./plotSPAndPresidentialElections.png", width = 40, height = 40, units = "cm", type = "cairo-png")
+
+```
+
+## PresidentialChart 4
+
+```{r plotPresidentialElection4, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="third plot"}
+
+
+# http://is-r.tumblr.com/search/background
+# plot by president and background lines
+
+```
 
 ```{r echo =FALSE}
 
