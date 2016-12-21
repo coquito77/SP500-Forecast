@@ -737,9 +737,8 @@ ggsave("./plotSPAndPresidentialElections.png", width = 40, height = 40, units = 
 
 ```
 
-## PresidentialChart 4
 
-```{r plotPresidentialElection4, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="last plot"}
+```{r plotPresidentialElection4, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="last plot", include=FALSE}
 
 
 # plot by president and background lines
@@ -748,8 +747,9 @@ ggsave("./plotSPAndPresidentialElections.png", width = 40, height = 40, units = 
 # http://stats.stackexchange.com/questions/190152/visualising-many-variables-in-one-plot?noredirect=1&lq=1
 
 df <- t %>% 
-  select( PercentChange, DaysElapsed, Event, Open) %>% 
-  mutate( Event2 = Event)
+  ##select( PercentChange, DaysElapsed, Event, Open) %>% 
+  mutate( Event  = as.factor(Event),
+          Event2 = Event)
 
 ggplot(df, aes(x = DaysElapsed, y = Open, group = Event2)) +
   geom_line(size = 0.5, alpha = 0.8,
@@ -759,8 +759,58 @@ ggplot(df, aes(x = DaysElapsed, y = Open, group = Event2)) +
   ylab("") +
   theme_bw() +
   theme(panel.border = element_blank(),
-        strip.background = element_blank()) +
+        strip.background = element_blank(),
+        strip.text.x = element_text(size = 5, colour = "orange", angle = 0)) +
   facet_wrap(~ Event)
+
+```
+
+
+
+## PresidentialChart 5
+
+```{r plotPresidentialElection5, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="fifth plot"}
+
+ggplot() +
+  geom_ribbon(size = 0.1, alpha = 1/3,
+            data = df %>%  select(DaysElapsed, PercentChange, Event2),
+            aes(x = DaysElapsed, ymin = PercentChange,
+                ymax = PercentChange, group = 1),
+            color = "grey") +
+  geom_line( data = df, color = "black",
+             aes(x = DaysElapsed, y = PercentChange, group = Event2),
+             size = 0.1) +
+  theme_bw() + 
+  theme(panel.border = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_text(size = 5, colour = "orange", angle = 0)) +
+  facet_wrap(~ Event) 
+
+```
+
+
+
+## PresidentialChart 6
+
+```{r plotPresidentialElection6, cache=FALSE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="sixth plot"}
+
+ggplot() +
+  geom_line(size = 0.1, alpha = 1/3,
+            data =  df %>%  select(DaysElapsed, PercentChange, Event2),
+            aes(x = DaysElapsed, y = PercentChange, group = Event2,
+                color = as.factor(Event2))
+            #,            color = "grey"
+  ) +
+  geom_line( data = df, color = "black",
+             aes(x = DaysElapsed, y = PercentChange, group = Event2),
+             size = 0.1) +
+  theme_bw() + 
+  theme(panel.border = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_text(size = 5,
+                                    colour = "orange",
+                                    angle = 0)) +
+  facet_wrap(~ Event) + guides(colour = "none")
 
 ```
 
