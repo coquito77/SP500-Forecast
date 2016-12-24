@@ -611,7 +611,7 @@ t %>% #filter(Years == 2015) %>% droplevels() %>%
             size = 1,
             check_overlap = TRUE) +
   geom_point(data = InagurationPoint, size = .5, colour = "blue", fill = "blue") +
-  scale_linetype_discrete(name = 'Discharge \nCohort',
+  scale_linetype_discrete(name = 'Election  \nYear',
                           guide = guide_legend(keywidth = 1,
                                                keyheight = .5,
                                                direction = "vertical",
@@ -627,7 +627,7 @@ t %>% #filter(Years == 2015) %>% droplevels() %>%
                                                label.theme = element_text(size = 10,
                                                                           colour = "black",
                                                                           angle = 00))) +
-  scale_colour_manual(name = 'Discharge \nCohort', 
+  scale_colour_manual(name = 'Election  \nYear', 
                       values = c("#7FC97F","#9EBBA9","#BEAED4","#DDB7AD",
                                  "#FDC086","#FEDF8F","#FFFF99","#9BB5A4","#386CB0",
                                  "#933797","#F0027F","#D72E4A","#BF5B17","#92603E","#000000"),
