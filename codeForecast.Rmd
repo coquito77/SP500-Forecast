@@ -50,6 +50,10 @@ library(grid)
 library(cv.ts) # devtools::install_github('zachmayer/cv.ts')
 library(forecast)
 library(reshape2)
+library(cowplot)
+# library(devtools)
+# install_github('sinhrks/ggfortify')
+library(ggfortify)
 
 ```
 
@@ -278,9 +282,9 @@ full()
 
 ```
 
-## Forecast graphs 1
 
-```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Forecasts"}
+
+```{r, echo =FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Forecasts", include=FALSE}
 # extract open price from the data
 # first need to resort the data by date
 
@@ -309,35 +313,38 @@ mod_tbats = tbats(x, use.parallel=FALSE)
 mod_bats = bats(x, use.parallel=FALSE)
 # mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets')
 # mod_sts = StructTS(x)
-mod_holdWinters = HoltWinters(x, beta=FALSE, gamma=FALSE)
-mod_linear = tslm(x ~ trend + season)
+# 
+mod_stl  =  stlm(x, s.window = 12, ic = 'aicc', robust = TRUE, method = 'ets')
+mod_sts  =  StructTS(x)
+mod_holdWinters  =  HoltWinters(x, beta = FALSE, gamma = FALSE)
+mod_linear  =  tslm(x ~ trend + season)
 
 ```
 
-```{r plot some graphs, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
-par(mar = rep(2, 4), mfrow=c(3,1))
+```{r plot some graphs, cache = TRUE, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 3, fig.width = 6, include = FALSE}
+par(mar  =  rep(2, 4), mfrow = c(3,1))
 
-plot(forecast(mod_arima, 12), include=120)
-plot(forecast(mod_exponential, 12), include=120)
-plot(forecast(mod_neural, 12), include=120)
+plot(forecast(mod_arima, 12), include = 120)
+plot(forecast(mod_exponential, 12), include = 120)
+plot(forecast(mod_neural, 12), include = 120)
 
 ```
 
-## Forecast graphs 2
 
-```{r plot some graphs2, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6, fig.cap="Forecasts"}
-par(mar = rep(2, 4), mfrow=c(4,1))
+```{r plot some graphs2, cache = TRUE, echo = FALSE, message = FALSE, warning = FALSE, fig.height = 3, fig.width = 6, fig.cap = "Forecasts", include = FALSE}
+par(mar  =  rep(2, 4), mfrow = c(4,1))
 
-plot(forecast(mod_tbats, 12), include=120)
+plot(forecast(mod_tbats, 12), include = 120)
 
-plot(forecast(mod_bats, 12), include=120)
-# plot(forecast(mod_sts, 12), include=120)
-plot(forecast(mod_holdWinters, 12), include=120)
-plot(forecast(mod_linear, 12), include=120)
+plot(forecast(mod_bats, 12), include = 120)
+# plot(forecast(mod_sts, 12), include = 120)
+plot(forecast(mod_holdWinters, 12), include = 120)
+plot(forecast(mod_linear, 12), include = 120)
+
 ```
 
 
-```{r, cache= TRUE}
+```{r, cache= TRUE, include=FALSE}
 
 # code below is from here
 # http://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r
@@ -378,7 +385,7 @@ models$naive = cv.ts(tsComboDataOpenPrice, naiveForecast, tsControl=ctrl)
 models$theta = cv.ts(tsComboDataOpenPrice, thetaForecast, tsControl=ctrl)
 
 ```
-```{r}
+```{r, include=FALSE}
 # Once we've fit the models, we can compare them by MAPE (cv.ts doesn't yet support MASE):
 
 res_overall <- lapply(models, function(x) x$results[13,-1])
@@ -389,11 +396,213 @@ res_overall <- round(res_overall, 2)
 
 ```
 
+## Forecast graphs 3
+
+```{r newplots, fig.width= 9, fig.height = 4, fig.cap= "Forecast plots.", echo=FALSE, message = FALSE, warning = FALSE, include=TRUE}
+
+d.arima <- auto.arima(tsComboDataOpenPrice)
+
+d.forecast <- forecast(d.arima, level = c(95), h = 24)
+
+plotForecast <- autoplot(d.forecast) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plotMod_arima <- autoplot(forecast(mod_arima, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plotMod_exponential <- autoplot(forecast(mod_exponential, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+# this one is different
+
+ mod_neural <- forecast(mod_neural, 24)
+
+ mod_neuralDF <- data.frame(Value = as.matrix(mod_neural$mean),
+                            date = time(mod_neural$mean))
+
+ mod_neuralDFfitted <- data.frame(Value = as.matrix(mod_neural$fitted),
+                                  date = time(mod_neural$fitted))
+
+ actual <- data.frame(Value = as.matrix(x),
+                      date = time(x))
+
+ plotMod_neural <- ggplot() +
+   geom_line(data = actual, aes(x = date, y = Value),
+             colour = "grey",
+             size = 0.5) +
+   geom_line(data = mod_neuralDF, aes(x = date, y = Value),
+             colour = "blue",
+             size = 0.5) +
+   geom_line(data = mod_neuralDFfitted, aes(x = date, y = Value),
+             colour = "blue",
+             size = 0.5) +
+   theme(axis.text.x = element_text(colour = "black",
+                                    size = 5,
+                                    angle = 00,
+                                    vjust = .5),
+         axis.title.x = element_blank())
+
+# plotMod_neural <- autoplot(forecast(mod_neural, 24)) +
+#    theme(axis.title.x = element_text(size = 8,
+#                                     angle = 00),
+#         axis.text.x = element_text(colour = "black",
+#                                    size = 5,
+#                                    angle = 00,
+#                                    vjust = .5))
+
+
+plotMod_mod_stl <- autoplot(forecast(mod_stl, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plotMod_mod_sts <- autoplot(forecast(mod_sts, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plotMod_tbats <- autoplot(forecast(mod_tbats, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plotMod_bats <- autoplot(forecast(mod_bats, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plotMod_holdWinters <- autoplot(forecast(mod_holdWinters, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plotMod_linear <- autoplot(forecast(mod_linear, 24)) +
+  # geom_line( aes(y = value),
+  #            colour = "grey",
+  #            size = 0.5) +
+  # geom_line( aes(y = Fitted),
+  #            colour = "blue",
+  #            size = 0.5) +
+  theme(axis.title.x = element_text(size = 8, 
+                                    angle = 00),
+        axis.text.x = element_text(colour = "black", 
+                                   size = 5, 
+                                   angle = 00, 
+                                   vjust = .5))
+
+plot_grid(plotForecast,
+          plotMod_arima,
+          plotMod_exponential,
+          plotMod_tbats,
+          plotMod_bats,
+          plotMod_neural,
+          plotMod_mod_stl,
+          plotMod_mod_sts,
+          plotMod_holdWinters,
+          plotMod_linear,
+          labels = c("Forecast",
+                     "ARIMA",
+                     "Exponential",
+                     "TBATS",
+                     "BATS",
+                     "Neural",
+                     "STL",
+                     "STS",
+                     "HoldWinters",
+                     "Linear"),
+          label_size = 5,
+          ncol = 5,
+          rel_widths = .5,
+          rel_heights = 1,
+          hjust = -2.0,
+          vjust = 1)
+
+```
+
+
 ## Forecast table
 
 ```{r tableForecasts, results='asis', message=FALSE, warning=FALSE, echo=FALSE, cache=FALSE, include=TRUE, fig.cap="Forecasts"}
 
-options(digits=1)
+options(digits = 1)
 Model <- c("naive","theta","exp","arima","sts","neural")
 
 modelTable <- cbind(Model, res_overall)
