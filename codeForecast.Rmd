@@ -1024,7 +1024,9 @@ ggplot() +
 ```
 
 ```{r echo =FALSE}
-
+#todo
+# add colorBrewer colors
+# add colors to faceted plot
 #get the time
 endTime <- Sys.time()
 
